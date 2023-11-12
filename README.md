@@ -1,4 +1,15 @@
-# Paper Boat
+# Paper Boat (Forked)
+## Development Repo
+This repo is for developers to develop the paper boat telegram boat.
+Consider creating and use your own branch and then merging back into the main
+
+
+### To do list:
+(to complete)
+- Use new version of python libraries for telegram
+- Add list of website for academic journals
+-
+
 
 Hey there! Are you an academic? Then probably you want to stay updated about all the papers and preprints published out there on a daily basis, but the information is so disperse, plus, it’s complicated to download papers. If you feel like that, then you are in the right place! 
 Paper Boat is a Telegram bot that delivers you the titles of all preprints and papers published today in all major journals, and helps you download them by DOI or title (from biorXiv, arXiv, or SciHub, the latter taking a little bit after a paper is published).
