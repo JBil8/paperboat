@@ -32,7 +32,7 @@ for span in title_spans:
     title = span.text.strip()
     titles.append(title)
 
-titles = list(set(titles))
+titles = list(set(titles)) # remove duplicates
 
 ALL_TITLES = ALL_TITLES + titles
 for i in range(len(titles)):

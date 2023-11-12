@@ -4,6 +4,13 @@ import spacy
 import datetime
 import openai
 
+API_URL = "https://api-inference.huggingface.co/models/bigscience/bloom"
+headers = {"Authorization": "Bearer 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"}
+
+def query(payload):
+	response = requests.post(API_URL, headers=headers, json=payload)
+	return response.json()
+
 num = 1
 openai.api_key = "OPENAI_KEY"
 #################
@@ -26,18 +33,22 @@ text = soup.get_text()
 nlp = spacy.load("en_core_web_sm")
 document = nlp(text)
 
-response = openai.ChatCompletion.create(
-  model="davinci",
-  prompt="Extract the titles from the following text:\n" + document,
-  max_tokens=200
-)
+# Extract titles using NER
+output = query({"inputs": "Give me the authors from the following text:\n" + document.text[:500],})
 
-titles = response['choices'][0]['text'].split("\n")
-titles = [title for title in titles if title.strip()]
-print(titles)
-# Initialize lists to store titles and authors
-titles = []
-authors = []
+print(output)
+# response = openai.ChatCompletion.create(
+#   model="davinci",
+#   prompt="Extract the titles from the following text:\n" + document,
+#   max_tokens=200
+# )
+
+# titles = response['choices'][0]['text'].split("\n")
+# titles = [title for title in titles if title.strip()]
+# print(titles)
+# # Initialize lists to store titles and authors
+# titles = []
+# authors = []
 
 # # Extract titles using NER
 # for ent in document.ents:
