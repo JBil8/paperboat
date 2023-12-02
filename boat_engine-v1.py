@@ -48,7 +48,6 @@ journal_flags = []
 
 journals = ["nature", "ng", "nbt", "ncomms", "nataging", "natbiomedeng", "natcancer", "natcardiovascres", "ncb", "ncb", "nm", "nmeth", "nprot", "natrevbioeng", "nrc", "nrcardio", "natrevchem", "nrclinonc", "nrg", "nrm", "nsmb"]
 
-
 for jour in journals:
     for x in range(1,10):
         print(x)
