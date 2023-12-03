@@ -5,7 +5,7 @@ import datetime
 #import openai
 
 API_URL = "https://api-inference.huggingface.co/models/bigscience/bloom"
-headers = {"Authorization": "Bearer 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"}
+headers = {"Authorization": "Bearer" + BLOOM_KEY}
 
 #bloom query function for LLM
 def query(payload):
