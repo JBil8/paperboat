@@ -20,7 +20,7 @@ def get_text(url):
 	soup = BeautifulSoup(html_content, "html.parser")
 	text = soup.get_text()
 	text = text.replace("\n\n", " ")
-	return text
+	return text[:500]
 
 def set_day(num=1):
 	"""Set the numeber of days to scrape starting from today

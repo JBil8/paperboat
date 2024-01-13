@@ -51,39 +51,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=ForceReply(selective=True),
     )
 
-async def callback_minute(context: ContextTypes.DEFAULT_TYPE):
-    #await context.bot.send_message(chat_id='385856535', text='One message every 10 seconds')
-    job = context.job
-    # Get the update from the context
-    update = context.job.context['update']
-    #await context.bot.send_message(chat_id=job.chat_id, text='One message every 10 seconds')
-    await give_text(context)
+# async def callback_minute(update: Updater ,context: ContextTypes.DEFAULT_TYPE):
+#     #await context.bot.send_message(chat_id='385856535', text='One message every 10 seconds')
+#     job = context.job
+#     # Get the update from the context
+#     update = context.job.context['update']
+#     #await context.bot.send_message(chat_id=job.chat_id, text='One message every 10 seconds')
+#     await give_text(context)
 
 async def set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Add a job to the queue."""
-    chat_id = update.effective_message.chat_id   
-    # Pass the 'update' to the context
-    job_context = {'update': update}
-
+    chat_id = update.effective_message.chat_id #get chat id dynamically
     job_interval = 10 # seconds
-    context.job_queue.run_repeating(callback_minute, context=job_context, chat_id=chat_id, interval=job_interval, first=0)
+    context.job_queue.run_repeating(give_text, chat_id=chat_id, interval=job_interval, first=1)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /help is issued."""
     #need to implement this
     await update.message.reply_text("Help! We are currently working on this feature.")
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Echo the user message."""
-    await update.message.reply_text(update.message.text)
-
-async def give_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def give_text(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Return the text from the journal"""
     #journal = update.message.text
     journal = "biorxiv"
     day = set_day()
     url = set_url(str(journal))
-    await update.message.reply_text(get_text(url))
+    print(context.job.chat_id)
+    await context.bot.send_message(chat_id=context.job.chat_id, text=get_text(url))
 
 
 def main() -> None:
@@ -95,10 +89,10 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     #application.add_handler(CommandHandler("journal_text", give_text))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, give_text))
+    #application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, give_text))
 
     # Schedule the job to run 
-    application.add_handler(CommandHandler("set", set_callback))
+    application.add_handler(CommandHandler("send_daily", set_callback))
     
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
