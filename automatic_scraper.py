@@ -5,12 +5,12 @@ import datetime
 #import openai
 
 API_URL = "https://api-inference.huggingface.co/models/bigscience/bloom"
-headers = {"Authorization": "Bearer" + BLOOM_KEY}
+# headers = {"Authorization": "Bearer" + BLOOM_KEY}
 
-#bloom query function for LLM
-def query(payload):
-	response = requests.post(API_URL, headers=headers, json=payload)
-	return response.json()
+# #bloom query function for LLM
+# def query(payload):
+# 	response = requests.post(API_URL, headers=headers, json=payload)
+# 	return response.json()
 
 def get_text(url):
 	response = requests.get(url)

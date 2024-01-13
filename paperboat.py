@@ -3,17 +3,16 @@
 # This program is dedicated to the public domain under the CC0 license.
 
 """
-Simple Bot to reply to Telegram messages.
+Development version of the PaperBoat bot.
 
 First, a few handler functions are defined. Then, those functions are passed to
 the Application and registered at their respective places.
 Then, the bot is started and runs until we press Ctrl-C on the command line.
 
-
 Usage:
 
 ```python
-python echobot.py
+python paperboat.py
 ```
 
 Press Ctrl-C on the command line to stop the bot.
@@ -23,7 +22,7 @@ Press Ctrl-C on the command line to stop the bot.
 import logging
 
 from telegram import ForceReply, Update
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, Updater, Job
 from keys import TELEGRAM_KEY_DEV
 
 #for automatic scraping
@@ -31,7 +30,7 @@ import requests
 from bs4 import BeautifulSoup
 import datetime
 
-from automatic_scraper import get_text, set_day, query, set_url
+from automatic_scraper import get_text, set_day, set_url #, query
 
 # Enable logging
 logging.basicConfig(
@@ -41,7 +40,6 @@ logging.basicConfig(
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
-
 
 # Define a few command handlers. These usually take the two arguments update and
 # context.
@@ -53,12 +51,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=ForceReply(selective=True),
     )
 
+async def callback_minute(context: ContextTypes.DEFAULT_TYPE):
+    #await context.bot.send_message(chat_id='385856535', text='One message every 10 seconds')
+    job = context.job
+    # Get the update from the context
+    update = context.job.context['update']
+    #await context.bot.send_message(chat_id=job.chat_id, text='One message every 10 seconds')
+    await give_text(context)
+
+async def set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Add a job to the queue."""
+    chat_id = update.effective_message.chat_id   
+    # Pass the 'update' to the context
+    job_context = {'update': update}
+
+    job_interval = 10 # seconds
+    context.job_queue.run_repeating(callback_minute, context=job_context, chat_id=chat_id, interval=job_interval, first=0)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /help is issued."""
     #need to implement this
-    await update.message.reply_text("Help!")
-
+    await update.message.reply_text("Help! We are currently working on this feature.")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Echo the user message."""
@@ -66,7 +79,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def give_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Return the text from the journal"""
-    journal = update.message.text
+    #journal = update.message.text
+    journal = "biorxiv"
     day = set_day()
     url = set_url(str(journal))
     await update.message.reply_text(get_text(url))
@@ -81,13 +95,14 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     #application.add_handler(CommandHandler("journal_text", give_text))
-    # on non command i.e message - echo the message on Telegram
-    #application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, give_text))
 
+    # Schedule the job to run 
+    application.add_handler(CommandHandler("set", set_callback))
+    
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
-
+    
 
 if __name__ == "__main__":
     main()  
