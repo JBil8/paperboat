@@ -27,8 +27,7 @@ links = pd.read_csv("paperboat_linksBIOLOGY.csv")
 today = str(datetime.date.today())
 
 # OpenAI API key
-openai.api_key = keys.OPENAI_KEY
-client = openai.OpenAI(api_key="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" ) # Initialize the OpenAI client
+client = openai.OpenAI(api_key=keys.OPENAI_KEY ) # Initialize the OpenAI client
 # pass key to client
 
 
