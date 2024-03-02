@@ -45,3 +45,5 @@ datasets
 torch
 soundfile
 playsound
+selenium
+webdriver_manager
