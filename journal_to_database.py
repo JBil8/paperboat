@@ -63,7 +63,7 @@ combined_df = pd.DataFrame(columns=["Title", "Date", "Journal", "Field"])
 
 from datetime import datetime
 
-for i in range(0, links.shape[0]):
+for i in range(0,1): #links.shape[0]):
 
     print(np.array(links['Journal'])[i])
     
@@ -127,5 +127,44 @@ for i in range(0, links.shape[0]):
         df['Journal'] = journal
         df['Field'] = field
         combined_df = pd.concat([combined_df, df], ignore_index=True)
+    
+
+
+
+
+combined_df = combined_df.loc[combined_df['Title'] != 'NO TITLE', :]
+combined_df = combined_df.loc[combined_df['Title'] != 'NO TITLE ', :]
+
+combined_df['Link'] = "https://www.bing.com"
+
+for s in np.array(combined_df["Title"]):
+    url = "https://www.bing.com/search?q=SUBSTITUTED"
+    modified_s = s.replace(" ", "+")
+    url = url.replace("SUBSTITUTED", modified_s)
+    response = requests.get(url).text 
+    soup = BeautifulSoup(response, 'html.parser')
+    titles = str(soup.get_text().replace("\n\n", " "))
+    
+    url_pattern = r'https?:\/\/(?:www\.)?[^\s]{2,}'
+    
+    urls = re.findall(url_pattern, titles)
+
+    try:
+        first_url = urls[0]
         
-        print(combined_df)
+        if "..." in first_url or "…" in first_url:
+            first_url = urls[1]
+            for i in range(len(first_url), 0, -1): 
+                if first_url[:i] and s.startswith(first_url[i-1:]):
+                    first_url = first_url[:i-1]
+                    break
+            combined_df.at[i, 'Link'] = first_url
+        else:
+            for i in range(len(first_url), 0, -1): 
+                if first_url[:i] and s.startswith(first_url[i-1:]):
+                    first_url = first_url[:i-1]
+                    break
+            combined_df.at[i, 'Link'] = first_url
+    except:
+        continue
+    print(first_url)
