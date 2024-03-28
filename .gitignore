@@ -166,6 +166,12 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 
+#csv files
+*.csv
+
+# critpo key
+criptokey.txt
+cripto_bot.txt
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

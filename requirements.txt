@@ -47,3 +47,4 @@ soundfile
 playsound
 selenium
 webdriver_manager
+criptography
