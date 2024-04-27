@@ -34,7 +34,6 @@ from cryptography.fernet import Fernet
 options = ['Bio', 'Photonics', 'Chemistry', 'Energy & Materials']
 
 
-
 path = os.getcwd() + '/'
 
 # Initialize Fernet key
@@ -42,18 +41,24 @@ with open(path + 'cripto_bot.txt', 'rb') as filekey:
     key = filekey.read()
 fernet = Fernet(key)
 
-# Create or connect to the SQLite database
-conn = sqlite3.connect(path + 'user_preferences.db')
-c = conn.cursor()
 
-# Create a table to store user preferences if it doesn't exist
-c.execute('''
-    CREATE TABLE IF NOT EXISTS user_preferences (
-        username TEXT PRIMARY KEY,
-        preferences TEXT
-    )
-''')
-conn.commit()
+def initialize_database():
+    path = os.getcwd() + '/'
+    db_path = path + 'users_preferences.db'
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users_preferences (
+            chat_id INTEGER PRIMARY KEY,
+            username TEXT,
+            preferences TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+initialize_database()
+
 
 # Enable logging
 logging.basicConfig(
@@ -66,36 +71,37 @@ logger = logging.getLogger(__name__)
 
 async def retrieve_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Retrieve and decrypt user preferences."""
-    username = update.effective_user.username
+    chat_id = update.message.chat_id
 
-    # Retrieve preferences from the database
-    c.execute("SELECT preferences FROM user_preferences WHERE username = ?", (username,))
+    conn = sqlite3.connect('users_preferences.db')
+    c = conn.cursor()
+    c.execute("SELECT preferences FROM users_preferences WHERE chat_id = ?", (chat_id,))
     row = c.fetchone()
-    if row:
+
+    if row and row[0]:
         encrypted_preferences = row[0]
-        # Decrypt preferences
         decrypted_preferences = fernet.decrypt(encrypted_preferences.encode()).decode()
         preferences_list = decrypted_preferences.split(',')
         await update.message.reply_text(f"Your preferences are: {preferences_list}")
     else:
         await update.message.reply_text("You haven't set any preferences yet.")
+    conn.close()
 
 async def send_preference_options(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message with preference options as inline buttons."""
-    # Determine the action based on the command used
+    chat_id = update.message.chat_id
     action = 'add' if 'add' in update.message.text else 'remove'
-    username = update.effective_user.username
     keyboard = []
-
-    # Define the available preferences
     available_preferences = ['Bio', 'Photonics', 'Chemistry', 'Energy & Materials']
 
-    # Fetch current preferences from the database
-    c.execute("SELECT preferences FROM user_preferences WHERE username = ?", (username,))
+    # Connect to the database and fetch current preferences
+    conn = sqlite3.connect('users_preferences.db')
+    c = conn.cursor()
+    c.execute("SELECT preferences FROM users_preferences WHERE chat_id = ?", (chat_id,))
     row = c.fetchone()
     current_preferences = []
 
-    if row:
+    if row and row[0]:
         encrypted_preferences = row[0]
         decrypted_preferences = fernet.decrypt(encrypted_preferences.encode()).decode()
         current_preferences = decrypted_preferences.split(',')
@@ -103,25 +109,28 @@ async def send_preference_options(update: Update, context: ContextTypes.DEFAULT_
     # Create a button for each preference
     for preference in available_preferences:
         if (action == 'add' and preference not in current_preferences) or (action == 'remove' and preference in current_preferences):
-            callback_data = f"{action}_{preference}"  # Format: "add_Bio" or "remove_Bio"
+            callback_data = f"{action}_{preference}"
             button_text = f"{'Add' if action == 'add' else 'Remove'} {preference}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Select an option:", reply_markup=reply_markup)
+    conn.close()
 
 async def update_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str, preference: str):
     """Update user preferences by adding or removing based on inline button presses."""
     query = update.callback_query
     await query.answer()  # Acknowledge the callback query first
-    username = query.from_user.username
+    chat_id = query.from_user.id
 
-    # Fetch current preferences
-    c.execute("SELECT preferences FROM user_preferences WHERE username = ?", (username,))
+    # Connect to the database and fetch current preferences
+    conn = sqlite3.connect('users_preferences.db')
+    c = conn.cursor()
+    c.execute("SELECT preferences FROM users_preferences WHERE chat_id = ?", (chat_id,))
     row = c.fetchone()
     preferences_list = []
 
-    if row:
+    if row and row[0]:
         encrypted_preferences = row[0]
         decrypted_preferences = fernet.decrypt(encrypted_preferences.encode()).decode()
         preferences_list = decrypted_preferences.split(',')
@@ -135,18 +144,17 @@ async def update_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE,
         preferences_list.remove(preference)
         updated = True
 
-    # Send confirmation message
     if updated:
-        message = f"{'Added' if action == 'add' else 'Removed'} {preference} to your preferences."
         encrypted_preferences = fernet.encrypt(','.join(preferences_list).encode()).decode()
-        c.execute("INSERT OR REPLACE INTO user_preferences (username, preferences) VALUES (?, ?)", (username, encrypted_preferences))
+        c.execute("UPDATE users_preferences SET preferences = ? WHERE chat_id = ?", (encrypted_preferences, chat_id))
         conn.commit()
         await set_callback(update, context)
+        message = f"{'Added' if action == 'add' else 'Removed'} {preference} to your preferences."
     else:
         message = "No changes made to your preferences."
 
     await query.edit_message_text(text=message)
-
+    conn.close()
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle callback queries from inline buttons."""
@@ -180,46 +188,46 @@ def partition_string(message):
     return partitions
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /start is issued."""
+    """Send a message when the command /start is issued and register the user."""
     user = update.effective_user
+    chat_id = update.message.chat_id
+    username = user.username
+
+    conn = sqlite3.connect('users_preferences.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO users_preferences (chat_id, username) VALUES (?, ?)
+        ON CONFLICT(chat_id) DO UPDATE SET username=excluded.username;
+    ''', (chat_id, username))
+    conn.commit()
+    conn.close()
+
     await update.message.reply_html(
-        rf"Hi {user.mention_html()} welcome to PaperBoat, the place to get up to date with current scientific literature in your field!",
+        rf"Hi {user.mention_html()}! Welcome to PaperBoat, the place to get up to date with current scientific literature in your field!",
         reply_markup=ForceReply(selective=True),
     )
 
-# async def set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-#     """Add a job to the queue."""
-#     chat_id = update.effective_message.chat_id
-#     job_interval = 60  # seconds
-
-#     # Check if a job already exists and remove it
-#     current_job = context.chat_data.get('job')
-#     if current_job is not None:
-#         current_job.schedule_removal()
-
-#     # Schedule a new job
-#     new_job = context.job_queue.run_repeating(give_text, chat_id=chat_id, interval=job_interval, first=1)
-#     context.chat_data['job'] = new_job  # Store the job object in chat_data
-
-#     await update.message.reply_text("You will now receive daily updates!")
-
-async def set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
-    
-        # Check if a job already exists and remove it
-    current_job = context.chat_data.get('job')
-    if current_job is not None:
-        current_job.schedule_removal()
+    job_interval = 60  # seconds
 
-    username = update.effective_user.username  # Get the username
-    job_data = {'chat_id': chat_id, 'username': username}
+    # Check and remove any existing job
+    if 'job' in context.chat_data:
+        old_job = context.chat_data['job']
+        old_job.schedule_removal()
+        del context.chat_data['job']
 
-    # Schedule a job with user-specific context
+    # Schedule a new job
     new_job = context.job_queue.run_repeating(
-        give_text, interval=60, first=1, context=job_data
+        give_text, interval=job_interval, first=1, chat_id=chat_id, name=str(chat_id)
     )
-    context.chat_data['job'] = new_job  # Store the job object in chat_data
-    await update.message.reply_text("You will now receive daily updates!")
+    context.chat_data['job'] = new_job
+
+    # Respond to the user
+    if update.effective_message:
+        await update.effective_message.reply_text("You will now receive daily updates!")
+    else:
+        logger.info("set_callback triggered without effective_message.")
 
 async def stop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Remove a job from the queue."""
@@ -240,51 +248,48 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text("Help! We are currently working on this feature.")
 
 async def give_text(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Send titles and link of papers published today from today.csv
-    """   
+    #chat_id = context.job.context  # Here, context is the chat_id passed to run_repeating
 
-    username = context.job.context
+    chat_id = context.job.chat_id
+    # Connect to the database
+    conn = sqlite3.connect(os.path.join(os.getcwd(), 'users_preferences.db'))
+    c = conn.cursor()
+
+    c.execute("SELECT preferences FROM users_preferences WHERE chat_id = ?", (chat_id,))
+
+    result = c.fetchone()
+    if result is None:
+        await context.bot.send_message(chat_id=chat_id, text="You have not set any preferences.")
+        return
+
+    encrypted_preferences = result[0]
+    decrypted_preferences = fernet.decrypt(encrypted_preferences.encode()).decode()
+    users_preferences = decrypted_preferences.split(',')
 
     # Initialize an empty string to store the message text
     message_text = ""
 
-    #import today.csv
+    # Import today.csv
     csv_file_path = 'today.csv'
-    
-    #open database
-    conn = sqlite3.connect(path + 'user_preferences.db')
-    c = conn.cursor()
-
-    #find the username in the csv file and check the fith column for the preferences
-    # Fetch user preferences from the database using chat_id
-    c.execute("SELECT preferences FROM users_preferences WHERE username = ?", (username,))
-    result = c.fetchone()
-
-    result = c.fetchone()
-    if not result:
-        await context.bot.send_message(chat_id=chat_id, text="You have not set any preferences.")
-        return
-
 
     # Open the CSV file in read mode
     with open(csv_file_path, 'r') as file:
-        # Create a CSV reader object
         csv_reader = csv.reader(file, delimiter=',')
-        
-         # Iterate over each row in the CSV file
         for row in csv_reader:
-            # Assuming the first column contains names and the second column contains URLs
-            name = row[1]
-            url = row[5]
-            
-            # Append the formatted HTML string to the message text
-            message_text += f"<a href='{url}'>{name}</a>\n"
-    
+            category = row[4]  # Assuming the category is in the 5th column
+            if category in users_preferences:
+                name = row[1]  # Assuming the name is in the 2nd column
+                url = row[5]  # Assuming the URL is in the 6th column
+                message_text += f"<a href='{url}'>{name}</a>\n"
+
+    if not message_text:
+        await context.bot.send_message(chat_id=chat_id, text="No papers found for your preferences today.")
+        return
+
     # Send the message text with hyperlinks using the Telegram bot
     chunked_text = partition_string(message_text)
     for chunk in chunked_text:
-        await context.bot.send_message(chat_id=context.job.chat_id, text=chunk, parse_mode='HTML')
+        await context.bot.send_message(chat_id=chat_id, text=chunk, parse_mode='HTML')
 
 
 def main() -> None:
